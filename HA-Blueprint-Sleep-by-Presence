@@ -1,0 +1,99 @@
+blueprint:
+  name: Schlafüberwachung mit Bewegungssensor (optional mit Android-TV Check)
+  description: Führt eine Aktion aus, wenn keine Bewegung erkannt wird, optional nur wenn der Android-TV eingeschaltet ist.
+  domain: automation
+  input:
+    bewegungssensor:
+      name: Bewegungssensor
+      description: Wähle den Bewegungssensor aus
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: motion
+
+    android_tv:
+      name: Android-TV
+      description: Wähle den Android-TV aus (optional)
+      selector:
+        entity:
+          domain: media_player
+      default: ""
+        
+    use_android_tv_check:
+      name: Android-TV Check verwenden
+      description: Ob die Überprüfung des Android-TV Status aktiviert werden soll
+      default: false
+      selector:
+        boolean:
+        
+    timer_duration:
+      name: Timer Dauer
+      description: Dauer, nach der die Aktion ausgeführt wird, wenn keine Bewegung erkannt wird
+      default: "00:05:00"
+      selector:
+        time:
+
+    action:
+      name: Aktion
+      description: Aktion, die ausgeführt werden soll, wenn keine Bewegung erkannt wird und (optional) der TV eingeschaltet ist
+      default: []
+      selector:
+        action: {}
+
+automation:
+  - alias: 'Schlafüberwachung mit Bewegungssensor (optional mit Android-TV Check)'
+    trigger:
+      # Auslösen bei Bewegungserkennung
+      - platform: state
+        entity_id: !input bewegungssensor
+        to: 'on'
+      # Auslösen, wenn keine Bewegung erkannt wurde
+      - platform: state
+        entity_id: !input bewegungssensor
+        to: 'off'
+        for:
+          minutes: "{{ (trigger.to_state.attributes.no_motion_duration or 5) | int }}" # Zeitdauer ohne Bewegung (anpassbar)
+          
+    condition:
+      # Bedingung nur prüfen, wenn use_android_tv_check aktiviert ist
+      - condition: template
+        value_template: >
+          {{ not is_state('input_boolean.use_android_tv_check', 'on') or
+             (is_state('input_boolean.use_android_tv_check', 'on') and is_state('media_player.android_tv', 'on')) }}
+          
+    action:
+      # Wenn Bewegung erkannt wurde
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: !input bewegungssensor
+                state: 'on'
+            sequence:
+              - service: script.turn_off
+                target:
+                  entity_id: script.bewegung_timer_abgelaufen
+              - service: script.turn_on
+                target:
+                  entity_id: script.bewegung_timer_abgelaufen
+                data:
+                  variables:
+                    timer_duration: !input timer_duration
+        default:
+          - service: script.turn_off
+            target:
+              entity_id: script.bewegung_timer_abgelaufen
+
+script:
+  bewegung_timer_abgelaufen:
+    alias: 'Bewegung Timer Abgelaufen'
+    sequence:
+      - delay: "{{ timer_duration }}"
+      - condition: state
+        entity_id: !input bewegungssensor
+        state: 'on'
+      - condition: template
+        value_template: >
+          {{ not is_state('input_boolean.use_android_tv_check', 'on') or
+             (is_state('input_boolean.use_android_tv_check', 'on') and is_state('media_player.android_tv', 'on')) }}
+      - choose:
+          - sequence: !input action
