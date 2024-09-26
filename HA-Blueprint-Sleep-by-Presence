@@ -1,6 +1,6 @@
 blueprint:
-  name: Motion Detection with `occupied` Check (Optional Android-TV Check)
-  description: Executes an action when motion is detected and the room remains `occupied` without further motion. Optionally checks if the Android TV is on before executing the action. If the same sensor reports both motion and occupancy, select it in both fields.
+  name: Motion Detection with `occupied` Check
+  description: Executes an action when motion is detected and the room remains `occupied` without further motion. If the same sensor reports both motion and occupancy, select it in both fields.
   domain: automation
   input:
     motion_sensor:
@@ -19,21 +19,6 @@ blueprint:
           domain: binary_sensor
           device_class: occupancy
 
-    android_tv:
-      name: Android TV (Optional)
-      description: Select the entity for your Android TV to check its status. Leave this field empty if no TV check is needed.
-      selector:
-        entity:
-          domain: media_player
-      default: ""
-
-    use_android_tv_check:
-      name: Use Android TV Check
-      description: Enable this option if the Android TV must be on for the action to be executed.
-      default: false
-      selector:
-        boolean:
-
     timer_duration:
       name: No Motion Timer Duration
       description: The duration after which the action will be executed if the room remains `occupied` without further motion.
@@ -43,25 +28,18 @@ blueprint:
 
     action:
       name: Action to Perform
-      description: The action to execute when the room remains `occupied` without motion. Optionally, only if the TV is on.
+      description: The action to execute when the room remains `occupied` without motion.
       default: []
       selector:
         action: {}
 
 automation:
-  - alias: 'Motion Detection with `occupied` Check (Optional Android-TV Check)'
+  - alias: 'Motion Detection with `occupied` Check'
     trigger:
       # Trigger when motion is detected
       - platform: state
         entity_id: !input motion_sensor
         to: 'on'
-
-    condition:
-      # Condition: Android TV must be on if `use_android_tv_check` is enabled
-      - condition: template
-        value_template: >
-          {{ not is_state('input_boolean.use_android_tv_check', 'on') or
-             (is_state('input_boolean.use_android_tv_check', 'on') and is_state('media_player.android_tv', 'on')) }}
 
     action:
       # When motion is detected, check `occupied` status
@@ -93,9 +71,5 @@ script:
       - condition: state
         entity_id: !input occupied_sensor
         state: 'on' # Sensor reports `occupied`
-      - condition: template
-        value_template: >
-          {{ not is_state('input_boolean.use_android_tv_check', 'on') or
-             (is_state('input_boolean.use_android_tv_check', 'on') and is_state('media_player.android_tv', 'on')) }}
       - choose:
           - sequence: !input action
