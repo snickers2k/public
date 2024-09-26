@@ -1,16 +1,15 @@
 blueprint:
-  name: Schlafüberwachung mit Bewegungssensor (optional mit Android-TV Check)
-  description: Führt eine Aktion aus, wenn keine Bewegung erkannt wird, optional nur wenn der Android-TV eingeschaltet ist.
+  name: Schlafüberwachung mit Bewegungssensor und `occupied`-Prüfung (optional mit Android-TV Check)
+  description: Führt eine Aktion aus, wenn der Raum als besetzt (occupied) gemeldet wird, aber keine Bewegung erkannt wird. Optional nur wenn der Android-TV eingeschaltet ist.
   domain: automation
   input:
     bewegungssensor:
       name: Bewegungssensor
-      description: Wähle den Bewegungssensor aus
+      description: Wähle den Bewegungssensor aus, der den `occupied`-Status meldet
       selector:
         entity:
           domain: binary_sensor
-          device_class: motion
-
+          
     android_tv:
       name: Android-TV
       description: Wähle den Android-TV aus (optional)
@@ -28,46 +27,47 @@ blueprint:
         
     timer_duration:
       name: Timer Dauer
-      description: Dauer, nach der die Aktion ausgeführt wird, wenn keine Bewegung erkannt wird
+      description: Dauer, nach der die Aktion ausgeführt wird, wenn keine Bewegung erkannt wird, aber `occupied` gemeldet wird
       default: "00:05:00"
       selector:
         time:
 
     action:
       name: Aktion
-      description: Aktion, die ausgeführt werden soll, wenn keine Bewegung erkannt wird und (optional) der TV eingeschaltet ist
+      description: Aktion, die ausgeführt werden soll, wenn `occupied` gemeldet wird, keine Bewegung erkannt wird und (optional) der TV eingeschaltet ist
       default: []
       selector:
         action: {}
 
 automation:
-  - alias: 'Schlafüberwachung mit Bewegungssensor (optional mit Android-TV Check)'
+  - alias: 'Schlafüberwachung mit Bewegungssensor und `occupied`-Prüfung (optional mit Android-TV Check)'
     trigger:
-      # Auslösen bei Bewegungserkennung
+      # Auslösen, wenn der Bewegungssensor auf `occupied` wechselt (Person im Raum)
       - platform: state
         entity_id: !input bewegungssensor
         to: 'on'
-      # Auslösen, wenn keine Bewegung erkannt wurde
+        
+      # Auslösen, wenn der Bewegungssensor auf `not_occupied` wechselt (Person verlässt den Raum)
       - platform: state
         entity_id: !input bewegungssensor
         to: 'off'
         for:
-          minutes: "{{ (trigger.to_state.attributes.no_motion_duration or 5) | int }}" # Zeitdauer ohne Bewegung (anpassbar)
-          
+          minutes: "{{ timer_duration | int }}" # Zeitdauer ohne Bewegung (anpassbar)
+
     condition:
-      # Bedingung nur prüfen, wenn use_android_tv_check aktiviert ist
+      # Bedingung nur prüfen, wenn `use_android_tv_check` aktiviert ist
       - condition: template
         value_template: >
           {{ not is_state('input_boolean.use_android_tv_check', 'on') or
              (is_state('input_boolean.use_android_tv_check', 'on') and is_state('media_player.android_tv', 'on')) }}
           
     action:
-      # Wenn Bewegung erkannt wurde
+      # Wenn `occupied` erkannt wurde und keine Bewegung
       - choose:
           - conditions:
               - condition: state
                 entity_id: !input bewegungssensor
-                state: 'on'
+                state: 'on' # `on` bedeutet `occupied`
             sequence:
               - service: script.turn_off
                 target:
@@ -90,7 +90,7 @@ script:
       - delay: "{{ timer_duration }}"
       - condition: state
         entity_id: !input bewegungssensor
-        state: 'on'
+        state: 'on' # Der Sensor meldet `occupied`
       - condition: template
         value_template: >
           {{ not is_state('input_boolean.use_android_tv_check', 'on') or
