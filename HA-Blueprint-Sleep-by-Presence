@@ -1,40 +1,41 @@
 blueprint:
   name: Schlafüberwachung mit Bewegungssensor und `occupied`-Prüfung (optional mit Android-TV Check)
-  description: Führt eine Aktion aus, wenn der Raum als besetzt (occupied) gemeldet wird, aber keine Bewegung erkannt wird. Optional nur wenn der Android-TV eingeschaltet ist.
+  description: Dieser Blueprint überwacht, ob sich eine Person im Raum befindet (`occupied`), aber keine Bewegung erkannt wird. Optional wird der Android-TV-Status überprüft, bevor eine Aktion ausgeführt wird.
   domain: automation
   input:
     bewegungssensor:
       name: Bewegungssensor
-      description: Wähle den Bewegungssensor aus, der den `occupied`-Status meldet
+      description: Wähle den Bewegungssensor aus, der den `occupied`-Status meldet.
       selector:
         entity:
           domain: binary_sensor
-          
+          device_class: motion
+
     android_tv:
-      name: Android-TV
-      description: Wähle den Android-TV aus (optional)
+      name: Android-TV (optional)
+      description: Wähle das Entity für deinen Android-TV aus, das als Bedingung geprüft werden soll. Lasse das Feld leer, wenn keine TV-Überprüfung gewünscht ist.
       selector:
         entity:
           domain: media_player
       default: ""
-        
+
     use_android_tv_check:
       name: Android-TV Check verwenden
-      description: Ob die Überprüfung des Android-TV Status aktiviert werden soll
+      description: Aktiviere diese Option, wenn der Android-TV eingeschaltet sein muss, damit die Aktion ausgeführt wird.
       default: false
       selector:
         boolean:
         
     timer_duration:
-      name: Timer Dauer
-      description: Dauer, nach der die Aktion ausgeführt wird, wenn keine Bewegung erkannt wird, aber `occupied` gemeldet wird
+      name: Timer Dauer ohne Bewegung
+      description: Dauer, nach der die Aktion ausgeführt wird, wenn der Raum als belegt (`occupied`) gemeldet wird, aber keine Bewegung erkannt wird.
       default: "00:05:00"
       selector:
         time:
 
     action:
-      name: Aktion
-      description: Aktion, die ausgeführt werden soll, wenn `occupied` gemeldet wird, keine Bewegung erkannt wird und (optional) der TV eingeschaltet ist
+      name: Auszuführende Aktion
+      description: Die Aktion, die ausgeführt werden soll, wenn der Raum als `occupied` gemeldet wird, aber keine Bewegung erkannt wird. Optional nur, wenn der TV eingeschaltet ist.
       default: []
       selector:
         action: {}
@@ -42,20 +43,20 @@ blueprint:
 automation:
   - alias: 'Schlafüberwachung mit Bewegungssensor und `occupied`-Prüfung (optional mit Android-TV Check)'
     trigger:
-      # Auslösen, wenn der Bewegungssensor auf `occupied` wechselt (Person im Raum)
+      # Auslösen, wenn der Bewegungssensor auf `on` wechselt (Raum ist belegt)
       - platform: state
         entity_id: !input bewegungssensor
         to: 'on'
         
-      # Auslösen, wenn der Bewegungssensor auf `not_occupied` wechselt (Person verlässt den Raum)
+      # Auslösen, wenn keine Bewegung erkannt wird, obwohl der Raum belegt ist
       - platform: state
         entity_id: !input bewegungssensor
         to: 'off'
         for:
-          minutes: "{{ timer_duration | int }}" # Zeitdauer ohne Bewegung (anpassbar)
+          minutes: "{{ (trigger.to_state.attributes.no_motion_duration or timer_duration) | int }}" # Zeitdauer ohne Bewegung (anpassbar)
 
     condition:
-      # Bedingung nur prüfen, wenn `use_android_tv_check` aktiviert ist
+      # Bedingung: Android-TV muss an sein, wenn `use_android_tv_check` aktiviert ist
       - condition: template
         value_template: >
           {{ not is_state('input_boolean.use_android_tv_check', 'on') or
