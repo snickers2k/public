@@ -1,0 +1,57 @@
+blueprint:
+  name: Epson Drucker Nachfüllen Benachrichtigung
+  description: 'Sende eine Benachrichtigung, wenn der Tintenstand für eine Farbe unter 20 % fällt.'
+  domain: automation
+  input:
+    color_sensors:
+      name: Tintenstand Sensoren
+      description: Wähle die Sensoren für die Tintenstände (Schwarz, Cyan, Magenta, Gelb).
+      selector:
+        entity:
+          domain: sensor
+          multiple: true
+    below_value:
+      name: Grenzwert
+      description: 'Wert, unter dem eine Benachrichtigung ausgelöst wird (z.B. 20%).'
+      default: 20
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+    notify_devices:
+      name: Geräte für Benachrichtigungen
+      description: 'Geräte, die die Benachrichtigung erhalten sollen (z.B. mobile Geräte).'
+      selector:
+        target:
+          entity:
+            domain: notify
+    color_names:
+      name: Farbnamen
+      description: 'Liste der Farbnamen in derselben Reihenfolge wie die Sensoren (z.B. Schwarz, Cyan, Magenta, Gelb).'
+      default: ['Schwarz', 'Cyan', 'Magenta', 'Gelb']
+      selector:
+        object:
+          multiple: true
+    notification_message:
+      name: Benachrichtigungstext
+      description: 'Text der Benachrichtigung. Verwende {{ color }} für die Farbe der Tinte.'
+      default: 'Die Farbe {{ color }} ist unter 20%.'
+      selector:
+        text
+
+trigger:
+  - platform: numeric_state
+    entity_id: !input color_sensors
+    below: !input below_value
+
+action:
+  - variables:
+      color_entity: "{{ trigger.entity_id }}"
+      color_index: "{{ color_sensors.index(color_entity) }}"
+      color: "{{ color_names[color_index] }}"
+  
+  - service: notify.notify
+    target: !input notify_devices
+    data:
+      message: "{{ notification_message }}"
