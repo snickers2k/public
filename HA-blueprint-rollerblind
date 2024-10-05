@@ -5,13 +5,15 @@ blueprint:
   input:
     remote:
       name: Fernbedienung
-      description: Das Fernbedienungsgerät.
+      description: Wähle die Fernbedienung.
       selector:
         device:
           integration: zha
+          entity:
+            domain: zha
     cover_device:
       name: Rollo
-      description: Das Rollo, das gesteuert wird.
+      description: Wähle das Rollo.
       selector:
         device:
           integration: cover
@@ -32,13 +34,11 @@ trigger:
     type: remote_button_short_press
     subtype: !input button_up
     id: Hoch
-    trigger: device
   - device_id: !input remote
     domain: zha
     type: remote_button_short_press
     subtype: !input button_down
     id: Runter
-    trigger: device
 
 condition: []
 
