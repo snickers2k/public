@@ -9,8 +9,6 @@ blueprint:
       selector:
         device:
           integration: zha
-          manufacturer: [Hersteller deiner Fernbedienung]
-          model: [Modell deiner Fernbedienung]
     cover_device:
       name: Rollo
       description: Das Rollo, das gesteuert wird.
@@ -27,7 +25,7 @@ blueprint:
       description: Der Button zum Herunterfahren des Rollos.
       selector:
         text:
-        
+
 trigger:
   - device_id: !input remote
     domain: zha
