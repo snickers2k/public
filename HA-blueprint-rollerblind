@@ -1,0 +1,108 @@
+blueprint:
+  name: Rollo Fernbedienung Steuerung
+  description: Steuerung eines Rollos mit einer Fernbedienung, die bei erneutem Drücken des gleichen Buttons stoppt.
+  domain: automation
+  input:
+    remote:
+      name: Fernbedienung
+      description: Das Fernbedienungsgerät.
+      selector:
+        device:
+          integration: zha
+          manufacturer: [Hersteller deiner Fernbedienung]
+          model: [Modell deiner Fernbedienung]
+    cover_device:
+      name: Rollo
+      description: Das Rollo, das gesteuert wird.
+      selector:
+        device:
+          integration: cover
+    button_up:
+      name: Hoch Button
+      description: Der Button zum Hochfahren des Rollos.
+      selector:
+        text:
+    button_down:
+      name: Runter Button
+      description: Der Button zum Herunterfahren des Rollos.
+      selector:
+        text:
+        
+trigger:
+  - device_id: !input remote
+    domain: zha
+    type: remote_button_short_press
+    subtype: !input button_up
+    id: Hoch
+    trigger: device
+  - device_id: !input remote
+    domain: zha
+    type: remote_button_short_press
+    subtype: !input button_down
+    id: Runter
+    trigger: device
+
+condition: []
+
+action:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: Hoch
+          - condition: or
+            conditions:
+              - condition: state
+                entity_id: !input cover_device
+                state: closing
+              - condition: state
+                entity_id: !input cover_device
+                state: opening
+        sequence:
+          - device_id: !input cover_device
+            domain: cover
+            entity_id: !input cover_device
+            type: stop
+      - conditions:
+          - condition: trigger
+            id: Hoch
+          - condition: not
+            conditions:
+              - condition: state
+                entity_id: !input cover_device
+                state: opening
+        sequence:
+          - device_id: !input cover_device
+            domain: cover
+            entity_id: !input cover_device
+            type: open
+      - conditions:
+          - condition: trigger
+            id: Runter
+          - condition: or
+            conditions:
+              - condition: state
+                entity_id: !input cover_device
+                state: opening
+              - condition: state
+                entity_id: !input cover_device
+                state: closing
+        sequence:
+          - device_id: !input cover_device
+            domain: cover
+            entity_id: !input cover_device
+            type: stop
+      - conditions:
+          - condition: trigger
+            id: Runter
+          - condition: not
+            conditions:
+              - condition: state
+                entity_id: !input cover_device
+                state: closing
+        sequence:
+          - device_id: !input cover_device
+            domain: cover
+            entity_id: !input cover_device
+            type: close
+
+mode: single
