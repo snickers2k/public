@@ -1,106 +1,142 @@
 blueprint:
-  name: Rollo Fernbedienung Steuerung
-  description: Steuerung eines Rollos mit einer Fernbedienung, die bei erneutem Drücken des gleichen Buttons stoppt.
+  name: Rollo Steuerung Fernbedienung (Zigbee)
+  description: Steuere ein Rollo mit einer Zigbee-Fernbedienung (Hoch und Runter). Stoppt das Rollo, wenn es bereits in Bewegung ist.
   domain: automation
   input:
     remote:
       name: Fernbedienung
-      description: Wähle die Fernbedienung.
+      description: Die Zigbee-Fernbedienung, die zum Steuern des Rollos verwendet wird.
       selector:
         device:
-          integration: zha
-          entity:
-            domain: zha
-    cover_device:
-      name: Rollo
-      description: Wähle das Rollo.
-      selector:
-        device:
-          integration: cover
-    button_up:
+          integration: {}
+    hoch_button:
       name: Hoch Button
-      description: Der Button zum Hochfahren des Rollos.
+      description: Der Button für Hoch auf der Fernbedienung.
       selector:
-        text:
-    button_down:
+        entity:
+          domain: button
+          device_class: button
+    runter_button:
       name: Runter Button
-      description: Der Button zum Herunterfahren des Rollos.
+      description: Der Button für Runter auf der Fernbedienung.
       selector:
-        text:
+        entity:
+          domain: button
+          device_class: button
+    rollo:
+      name: Rollo
+      description: Das zu steuernde Rollo.
+      selector:
+        entity:
+          domain: cover
 
 trigger:
-  - device_id: !input remote
-    domain: zha
-    type: remote_button_short_press
-    subtype: !input button_up
+  - platform: device
+    device_id: !input remote
+    domain: button
+    entity_id: !input hoch_button
+    type: pressed
     id: Hoch
-  - device_id: !input remote
-    domain: zha
-    type: remote_button_short_press
-    subtype: !input button_down
+  - platform: device
+    device_id: !input remote
+    domain: button
+    entity_id: !input runter_button
+    type: pressed
     id: Runter
-
-condition: []
 
 action:
   - choose:
+      # --- Wenn Hoch gedrückt wird ---
       - conditions:
           - condition: trigger
             id: Hoch
-          - condition: or
-            conditions:
-              - condition: state
-                entity_id: !input cover_device
-                state: closing
-              - condition: state
-                entity_id: !input cover_device
-                state: opening
         sequence:
-          - device_id: !input cover_device
-            domain: cover
-            entity_id: !input cover_device
-            type: stop
-      - conditions:
-          - condition: trigger
-            id: Hoch
-          - condition: not
-            conditions:
-              - condition: state
-                entity_id: !input cover_device
-                state: opening
-        sequence:
-          - device_id: !input cover_device
-            domain: cover
-            entity_id: !input cover_device
-            type: open
-      - conditions:
-          - condition: trigger
-            id: Runter
-          - condition: or
-            conditions:
-              - condition: state
-                entity_id: !input cover_device
-                state: opening
-              - condition: state
-                entity_id: !input cover_device
-                state: closing
-        sequence:
-          - device_id: !input cover_device
-            domain: cover
-            entity_id: !input cover_device
-            type: stop
-      - conditions:
-          - condition: trigger
-            id: Runter
-          - condition: not
-            conditions:
-              - condition: state
-                entity_id: !input cover_device
-                state: closing
-        sequence:
-          - device_id: !input cover_device
-            domain: cover
-            entity_id: !input cover_device
-            type: close
+          - choose:
+              # Falls das Rollo gerade schließt oder öffnet, stoppe es
+              - conditions:
+                  - condition: or
+                    conditions:
+                      - condition: state
+                        entity_id: !input rollo
+                        state: closing
+                      - condition: state
+                        entity_id: !input rollo
+                        state: opening
+                sequence:
+                  - service: logbook.log
+                    data:
+                      name: "Rollo Steuerung"
+                      message: "Stoppe Rollo, da Hoch gedrückt wurde"
+                  - service: cover.stop_cover
+                    target:
+                      entity_id: !input rollo
+                  - wait_template: "{{ is_state(input.rollo, 'stopped') }}"
+                  - service: logbook.log
+                    data:
+                      name: "Rollo Steuerung"
+                      message: "Rollo gestoppt"
 
-mode: single
+              # Falls das Rollo nicht bereits öffnet, öffne es
+              - conditions:
+                  - condition: not
+                    conditions:
+                      - condition: state
+                        entity_id: !input rollo
+                        state: opening
+                sequence:
+                  - service: logbook.log
+                    data:
+                      name: "Rollo Steuerung"
+                      message: "Öffne Rollo, da Hoch gedrückt wurde"
+                  - service: cover.open_cover
+                    target:
+                      entity_id: !input rollo
+
+      # --- Wenn Runter gedrückt wird ---
+      - conditions:
+          - condition: trigger
+            id: Runter
+        sequence:
+          - choose:
+              # Falls das Rollo gerade öffnet oder schließt, stoppe es
+              - conditions:
+                  - condition: or
+                    conditions:
+                      - condition: state
+                        entity_id: !input rollo
+                        state: opening
+                      - condition: state
+                        entity_id: !input rollo
+                        state: closing
+                sequence:
+                  - service: logbook.log
+                    data:
+                      name: "Rollo Steuerung"
+                      message: "Stoppe Rollo, da Runter gedrückt wurde"
+                  - service: cover.stop_cover
+                    target:
+                      entity_id: !input rollo
+                  - wait_template: "{{ is_state(input.rollo, 'stopped') }}"
+                  - service: logbook.log
+                    data:
+                      name: "Rollo Steuerung"
+                      message: "Rollo gestoppt"
+
+              # Falls das Rollo nicht bereits schließt, schließe es
+              - conditions:
+                  - condition: not
+                    conditions:
+                      - condition: state
+                        entity_id: !input rollo
+                        state: closing
+                sequence:
+                  - service: logbook.log
+                    data:
+                      name: "Rollo Steuerung"
+                      message: "Schließe Rollo, da Runter gedrückt wurde"
+                  - service: cover.close_cover
+                    target:
+                      entity_id: !input rollo
+                  - delay: "00:00:02"  # 2 Sekunden Verzögerung als zusätzliche Absicherung
+
+mode: restart
